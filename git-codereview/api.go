@@ -12,6 +12,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"os/user"
 	"path/filepath"
 	"runtime"
@@ -60,10 +61,10 @@ func loadGerritOriginInternal(origin, remoteOrigin string) error {
 	originUrl, err := url.Parse(remoteOrigin)
 	if err != nil {
 		return fmt.Errorf("failed to parse git's remote.origin.url %q as a URL: %v", remoteOrigin, err)
-	} else {
-		originUrl.User = nil
-		remoteOrigin = originUrl.String()
 	}
+
+	originUrl.User = nil
+	remoteOrigin = originUrl.String()
 	hasGerritConfig := true
 	if origin == "" {
 		hasGerritConfig = false
@@ -73,8 +74,8 @@ func loadGerritOriginInternal(origin, remoteOrigin string) error {
 		return fmt.Errorf("git origin must be a Gerrit host, not GitHub: %s", origin)
 	}
 
-	if !strings.HasPrefix(origin, "https://") {
-		return fmt.Errorf("git origin must be an https:// URL: %s", origin)
+	if !isAllowedScheme(originUrl.Scheme) {
+		return fmt.Errorf("git origin must be an allowed scheme. Want: %v, Got: %s", allowedSchemes(), origin)
 	}
 
 	if googlesourceIndex := strings.Index(origin, ".googlesource.com"); googlesourceIndex >= 0 {
@@ -120,6 +121,26 @@ func loadGerritOriginInternal(origin, remoteOrigin string) error {
 	}
 
 	return nil
+}
+
+func allowedSchemes() []string {
+	allowed := []string{"https"}
+	// GIT_ALLOW_PROTOCOL is an environment variable defined by Git. It is a
+	// colon-separated list of schemes that are allowed to be used with git
+	// commands. Any scheme not mentioned will not be allowed.
+	if allow := os.Getenv("GIT_ALLOW_PROTOCOL"); allow != "" {
+		allowed = strings.Split(allow, ":")
+	}
+	return allowed
+}
+
+func isAllowedScheme(scheme string) bool {
+	for _, s := range allowedSchemes() {
+		if s == scheme {
+			return true
+		}
+	}
+	return false
 }
 
 // testHomeDir is empty for normal use. During tests it may be set and used

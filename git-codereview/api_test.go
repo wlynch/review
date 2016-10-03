@@ -164,6 +164,17 @@ func TestLoadGerritOrigin(t *testing.T) {
 			url:       "https://mysite.com/gerrit",
 			project:   "sub/projectA",
 		},
+		{
+			// Gerrit origin is set.
+			// Gerrit is hosted on a sub-domain.
+			// Gerrit origin uses custom scheme.
+			origin:    "foo://gerrit.mysite.com",
+			originUrl: "foo://gerrit.mysite.com/projectA",
+			host:      "gerrit.mysite.com",
+			url:       "https://gerrit.mysite.com",
+			project:   "projectA",
+			fail:      true,
+		},
 	}
 
 	for _, item := range list {
@@ -171,15 +182,93 @@ func TestLoadGerritOrigin(t *testing.T) {
 		auth.url = ""
 		auth.project = ""
 		err := loadGerritOriginInternal(item.origin, item.originUrl)
+
 		if err != nil && !item.fail {
 			t.Errorf("unexpected error from item %q %q: %v", item.origin, item.originUrl, err)
+			continue
+		}
+		if item.fail {
+			if err == nil {
+				t.Errorf("expected error from item %q %q, got nil", item.origin, item.originUrl)
+			}
 			continue
 		}
 		if auth.host != item.host || auth.url != item.url || auth.project != item.project {
 			t.Errorf("want %q %q %q, got %q %q %q", item.host, item.url, item.project, auth.host, auth.url, auth.project)
 			continue
 		}
-		if item.fail {
+		have := haveGerritInternal(item.origin, item.originUrl)
+		if !have {
+			t.Errorf("for %q %q expect haveGerrit() == true, but got false", item.origin, item.originUrl)
+		}
+	}
+}
+
+func TestLoadGerritOriginGitAllowProtocol(t *testing.T) {
+	list := []struct {
+		origin, originUrl, host, url, project string
+	}{
+		{
+			// *.googlesource.com
+			origin:    "",
+			originUrl: "https://go.googlesource.com/crypto",
+			host:      "go.googlesource.com",
+			url:       "https://go-review.googlesource.com",
+			project:   "crypto",
+		},
+		{
+			// Gerrit origin is set.
+			// Gerrit is hosted on a sub-domain.
+			origin:    "https://gerrit.mysite.com",
+			originUrl: "https://gerrit.mysite.com/projectA",
+			host:      "gerrit.mysite.com",
+			url:       "https://gerrit.mysite.com",
+			project:   "projectA",
+		},
+		{
+			// Gerrit origin is set.
+			// Gerrit is hosted under sub-path under "/gerrit".
+			origin:    "https://mysite.com/gerrit",
+			originUrl: "https://mysite.com/gerrit/projectA",
+			host:      "mysite.com",
+			url:       "https://mysite.com/gerrit",
+			project:   "projectA",
+		},
+		{
+			// Gerrit origin is set.
+			// Gerrit is hosted under sub-path under "/gerrit" and repo is under
+			// sub-folder.
+			origin:    "https://mysite.com/gerrit",
+			originUrl: "https://mysite.com/gerrit/sub/projectA",
+			host:      "mysite.com",
+			url:       "https://mysite.com/gerrit",
+			project:   "sub/projectA",
+		},
+		{
+			// Gerrit origin is set.
+			// Gerrit is hosted on a sub-domain.
+			// Gerrit origin uses custom scheme.
+			origin:    "foo://gerrit.mysite.com",
+			originUrl: "foo://gerrit.mysite.com/projectA",
+			host:      "gerrit.mysite.com",
+			url:       "foo://gerrit.mysite.com",
+			project:   "projectA",
+		},
+	}
+
+	os.Setenv("GIT_ALLOW_PROTOCOL", "https:foo")
+	defer os.Unsetenv("GIT_ALLOW_PROTOCOL")
+	for _, item := range list {
+		auth.host = ""
+		auth.url = ""
+		auth.project = ""
+		err := loadGerritOriginInternal(item.origin, item.originUrl)
+		if err != nil {
+			t.Errorf("unexpected error from item %q %q: %v", item.origin, item.originUrl, err)
+			continue
+		}
+		if auth.host != item.host || auth.url != item.url || auth.project != item.project {
+			t.Errorf("want %q %q %q, got %q %q %q", item.host, item.url, item.project, auth.host, auth.url, auth.project)
 			continue
 		}
 		have := haveGerritInternal(item.origin, item.originUrl)

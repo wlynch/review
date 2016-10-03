@@ -110,6 +110,13 @@ Available commands:
 		Fetch changes from the remote repository and merge them into
 		the current branch, rebasing the change commit on top of them.
 
+Environment Variables:
+
+	GIT_ALLOW_PROTOCOL
+		Defined by Git. A colon-separated list of schemes that are allowed to be
+		used with git commands. If set, any scheme not explicitly mentioned will
+		not be allowed.
+
 
 `
 
